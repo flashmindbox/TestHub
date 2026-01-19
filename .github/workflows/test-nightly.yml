@@ -1,0 +1,96 @@
+name: Nightly Full Test Suite
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Run at 2 AM UTC daily
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  ENV: staging
+  CI: true
+
+jobs:
+  full-test-suite:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: [e2e, api, visual, a11y, perf]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run ${{ matrix.test-type }} tests
+        run: npm run test:${{ matrix.test-type }}
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          API_URL: ${{ secrets.STAGING_API_URL }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.test-type }}-report
+          path: reports/
+          retention-days: 30
+
+  cross-browser:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run critical tests on ${{ matrix.browser }}
+        run: npx playwright test tests/e2e/studytab/critical-paths --project=${{ matrix.browser }}
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          API_URL: ${{ secrets.STAGING_API_URL }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-browser-${{ matrix.browser }}
+          path: reports/
+          retention-days: 30
+
+  notify-on-failure:
+    runs-on: ubuntu-latest
+    needs: [full-test-suite, cross-browser]
+    if: failure()
+    steps:
+      - name: Notify on failure
+        run: |
+          echo "Tests failed! Check the workflow run for details."
+          # Add Slack/Discord notification here if needed

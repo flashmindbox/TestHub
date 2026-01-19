@@ -1,0 +1,93 @@
+name: Manual Test Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-type:
+        description: 'Test type to run'
+        required: true
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - e2e
+          - api
+          - visual
+          - a11y
+          - perf
+          - all
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - local
+          - staging
+          - production
+      project:
+        description: 'Project to test'
+        required: true
+        default: 'studytab'
+        type: string
+      update-snapshots:
+        description: 'Update visual snapshots'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  ENV: ${{ github.event.inputs.environment }}
+  CI: true
+
+jobs:
+  manual-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run tests
+        run: |
+          if [ "${{ github.event.inputs.test-type }}" == "all" ]; then
+            npm test -- --grep @${{ github.event.inputs.project }}
+          else
+            npm run test:${{ github.event.inputs.test-type }} -- --grep @${{ github.event.inputs.project }}
+          fi
+
+          if [ "${{ github.event.inputs.update-snapshots }}" == "true" ]; then
+            npm run visual:update
+          fi
+        env:
+          BASE_URL: ${{ secrets[format('{0}_BASE_URL', github.event.inputs.environment)] }}
+          API_URL: ${{ secrets[format('{0}_API_URL', github.event.inputs.environment)] }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-test-report-${{ github.event.inputs.test-type }}
+          path: reports/
+          retention-days: 14
+
+      - name: Commit updated snapshots
+        if: github.event.inputs.update-snapshots == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add tests/visual/baselines/
+          git diff --staged --quiet || git commit -m "Update visual snapshots [skip ci]"
+          git push

@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Test artifacts
+reports/
+test-results/
+playwright-report/
+.auth/
+
+# Environment files with secrets
+config/environments/*.env
+!config/environments/*.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+
+# Temp files
+*.tmp
+*.temp
