@@ -2,11 +2,22 @@ import { Page, APIRequestContext, BrowserContext } from '@playwright/test';
 import { CreatedResource } from './test-data.types';
 import { ProjectConfig } from './project.types';
 
+export interface FailedCleanup {
+  resource: CreatedResource;
+  error: Error;
+  timestamp: Date;
+  retryCount: number;
+}
+
 export interface CleanupTracker {
   track: (resource: CreatedResource) => void;
   getAll: () => CreatedResource[];
   cleanup: (page: Page, apiContext: APIRequestContext) => Promise<void>;
   clear: () => void;
+  hasFailures: () => boolean;
+  getFailures: () => FailedCleanup[];
+  getFailureReport: () => string;
+  clearFailures: () => void;
 }
 
 export interface AuthFixture {

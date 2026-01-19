@@ -32,3 +32,5 @@ export {
   RELAXED_BUDGETS,
 } from './performance.fixture';
 export type { PerformanceFixture, PerformanceFixtureOptions } from './performance.fixture';
+export { test as isolatedUserTest } from './isolated-user.fixture';
+export type { IsolatedUserFixtures, PoolUser } from './isolated-user.fixture';

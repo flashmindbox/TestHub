@@ -1,6 +1,7 @@
 import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { FormComponent } from '../_common';
+import { getTimeout } from '../../config/timeouts';
 
 export class LoginPage extends BasePage {
   readonly form: FormComponent;
@@ -37,7 +38,7 @@ export class LoginPage extends BasePage {
 
   async loginAndWaitForDashboard(email: string, password: string) {
     await this.login(email, password);
-    await this.page.waitForURL('**/dashboard**', { timeout: 15000 });
+    await this.page.waitForURL('**/dashboard**', { timeout: getTimeout('navigation') });
   }
 
   async getErrorMessage(): Promise<string | null> {

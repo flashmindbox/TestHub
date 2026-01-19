@@ -1,4 +1,10 @@
 import { APIRequestContext } from '@playwright/test';
+import { withApiRetry, RetryOptions } from './retry';
+
+export interface RequestOptions {
+  headers?: Record<string, string>;
+  retry?: boolean | RetryOptions;
+}
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -40,45 +46,73 @@ export function createApiClient(request: APIRequestContext, config: ApiClientCon
     return await response.text() as unknown as T;
   }
 
+  async function executeWithRetry<T>(
+    fn: () => Promise<T>,
+    retry?: boolean | RetryOptions
+  ): Promise<T> {
+    if (retry === false) {
+      return fn();
+    }
+    const retryOpts = typeof retry === 'object' ? retry : undefined;
+    return withApiRetry(fn, retryOpts);
+  }
+
   return {
     request,
 
-    async get<T>(path: string, options?: { headers?: Record<string, string> }): Promise<T> {
-      const response = await request.get(`${baseUrl}${path}`, {
-        headers: { ...defaultHeaders, ...options?.headers },
-      });
-      return handleResponse<T>(response);
+    async get<T>(path: string, options?: RequestOptions): Promise<T> {
+      const fetchFn = async () => {
+        const response = await request.get(`${baseUrl}${path}`, {
+          headers: { ...defaultHeaders, ...options?.headers },
+        });
+        return handleResponse<T>(response);
+      };
+      return executeWithRetry(fetchFn, options?.retry);
     },
 
-    async post<T>(path: string, data?: unknown, options?: { headers?: Record<string, string> }): Promise<T> {
-      const response = await request.post(`${baseUrl}${path}`, {
-        data,
-        headers: { ...defaultHeaders, ...options?.headers },
-      });
-      return handleResponse<T>(response);
+    async post<T>(path: string, data?: unknown, options?: RequestOptions): Promise<T> {
+      const fetchFn = async () => {
+        const response = await request.post(`${baseUrl}${path}`, {
+          data,
+          headers: { ...defaultHeaders, ...options?.headers },
+        });
+        return handleResponse<T>(response);
+      };
+      // POST requests don't retry by default (not idempotent)
+      return executeWithRetry(fetchFn, options?.retry ?? false);
     },
 
-    async put<T>(path: string, data?: unknown, options?: { headers?: Record<string, string> }): Promise<T> {
-      const response = await request.put(`${baseUrl}${path}`, {
-        data,
-        headers: { ...defaultHeaders, ...options?.headers },
-      });
-      return handleResponse<T>(response);
+    async put<T>(path: string, data?: unknown, options?: RequestOptions): Promise<T> {
+      const fetchFn = async () => {
+        const response = await request.put(`${baseUrl}${path}`, {
+          data,
+          headers: { ...defaultHeaders, ...options?.headers },
+        });
+        return handleResponse<T>(response);
+      };
+      return executeWithRetry(fetchFn, options?.retry);
     },
 
-    async delete<T>(path: string, options?: { headers?: Record<string, string> }): Promise<T> {
-      const response = await request.delete(`${baseUrl}${path}`, {
-        headers: { ...defaultHeaders, ...options?.headers },
-      });
-      return handleResponse<T>(response);
+    async delete<T>(path: string, options?: RequestOptions): Promise<T> {
+      const fetchFn = async () => {
+        const response = await request.delete(`${baseUrl}${path}`, {
+          headers: { ...defaultHeaders, ...options?.headers },
+        });
+        return handleResponse<T>(response);
+      };
+      return executeWithRetry(fetchFn, options?.retry);
     },
 
-    async patch<T>(path: string, data?: unknown, options?: { headers?: Record<string, string> }): Promise<T> {
-      const response = await request.patch(`${baseUrl}${path}`, {
-        data,
-        headers: { ...defaultHeaders, ...options?.headers },
-      });
-      return handleResponse<T>(response);
+    async patch<T>(path: string, data?: unknown, options?: RequestOptions): Promise<T> {
+      const fetchFn = async () => {
+        const response = await request.patch(`${baseUrl}${path}`, {
+          data,
+          headers: { ...defaultHeaders, ...options?.headers },
+        });
+        return handleResponse<T>(response);
+      };
+      // PATCH requests don't retry by default (not idempotent)
+      return executeWithRetry(fetchFn, options?.retry ?? false);
     },
   };
 }

@@ -63,3 +63,16 @@ export {
   type MetricResult,
   type PerformanceBudgetOptions,
 } from './performance-budget';
+export {
+  withRetry,
+  withApiRetry,
+  RetryError,
+  type RetryOptions,
+} from './retry';
+export {
+  UserPool,
+  getUserPool,
+  resetUserPool,
+  type PoolUser,
+  type UserPoolConfig,
+} from './user-pool';
