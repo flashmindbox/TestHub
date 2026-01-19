@@ -11,9 +11,9 @@
 │                     STUDYTAB TEST COVERAGE SUMMARY                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│   Total Tests:        400+                                                  │
-│   Test Types:         7                                                     │
-│   Features Covered:   12 major areas                                        │
+│   Total Tests:        420+                                                  │
+│   Test Types:         8                                                     │
+│   Features Covered:   14 major areas                                        │
 │   Coverage Level:     Comprehensive                                         │
 │                                                                             │
 │   ████████████████████████████████████████████░░░░░  ~90%                   │
@@ -44,6 +44,7 @@
 │  Error Handling          ✓     ✓     -       -     -     -                  │
 │  Navigation              ✓     -     ✓       ✓     -     -                  │
 │  API Contracts           -     ✓     -       -     -     -                  │
+│  Security                ✓     ✓     -       -     -     -                  │
 │                                                                             │
 │  Legend: ✓ = Covered, - = Not Applicable/Not Yet                            │
 │                                                                             │
@@ -70,7 +71,9 @@
 | Performance | 19 | ████████████████░░░░ Good |
 | Accessibility | 15 | ████████████░░░░░░░░ Adequate |
 | Component Tests | 154 | ████████████████████ Complete |
-| **TOTAL** | **400+** | |
+| Security Tests | 20 | ████████████████████ Complete |
+| Login Edge Cases | 12 | ████████████████████ Complete |
+| **TOTAL** | **420+** | |
 
 ### By Test Type
 
@@ -84,6 +87,7 @@
 | Accessibility | 15 | WCAG compliance |
 | Performance | 19 | Speed benchmarks |
 | Component Tests | 154 | Isolated UI testing |
+| Security Tests | ~20 | Security validation |
 
 ---
 
@@ -332,6 +336,45 @@
   └── Affects due dates correctly
 ```
 
+### Security Tests (20 tests)
+
+```
+✓ XSS Prevention (tests/security/studytab/xss-prevention.spec.ts)
+  ├── Script tags stripped from deck names
+  ├── Event handlers removed from card content
+  ├── JavaScript URLs blocked
+  ├── SVG XSS payloads sanitized
+  ├── Encoded XSS payloads handled
+  └── Malicious URLs sanitized
+
+✓ Authorization Boundaries (tests/security/studytab/auth-boundaries.spec.ts)
+  ├── Cannot access other users' decks
+  ├── Cannot edit other users' cards
+  ├── Cannot delete other users' data
+  ├── API rejects unauthenticated requests
+  ├── Admin routes protected
+  └── IDOR prevention (ID manipulation)
+```
+
+### Login Edge Cases (12 tests)
+
+```
+✓ Rate Limiting (tests/e2e/studytab/auth/login-edge-cases.spec.ts)
+  ├── Multiple failed attempts tracked
+  ├── Account lockout after threshold
+  └── Lockout message displayed
+
+✓ Session Handling
+  ├── Session timeout behavior
+  ├── Concurrent session limits
+  └── Session invalidation on password change
+
+✓ Input Edge Cases
+  ├── Very long email handling
+  ├── Unicode in credentials
+  └── SQL injection prevention
+```
+
 ---
 
 ## User Journey Coverage
@@ -400,4 +443,4 @@ Checked against WCAG 2.1 Level AA:
 
 ---
 
-*Last updated: January 2025*
+*Last updated: January 2025 (Hardening Phase Complete)*

@@ -358,6 +358,127 @@ lsof -ti:3002 | xargs kill -9
 
 ---
 
+## Retry-Related Issues
+
+### "Test passes on retry but fails initially"
+
+- **Cause:** Transient network or timing issues
+- **Action:** This is expected behavior - retry logic handles it
+- **Investigate if:** It happens consistently (indicates underlying problem)
+- **Check:** Network stability, API latency, database connection pool
+
+### "Max retries exceeded"
+
+- **Cause:** The API failed 3+ times consecutively
+- **Check:** Is the backend running? Is the endpoint correct?
+- **Solution:** Fix the root cause, or increase maxRetries if needed
+- **Debug:** Check network requests in test trace
+
+```typescript
+// To increase retries for a specific call:
+const data = await withApiRetry(() => apiClient.get('/slow-endpoint'), {
+  maxRetries: 5,
+  initialDelay: 2000,
+});
+```
+
+---
+
+## User Pool Issues
+
+### "No users available in pool"
+
+- **Cause:** All test users are in use by other workers
+- **Solutions:**
+  - Reduce parallelism: `npm run test:e2e -- --workers=2`
+  - Increase pool size in user-pool.ts config
+- **Check:** Are tests properly releasing users on completion?
+
+### "User pool timeout"
+
+- **Cause:** Waited too long for a user to become available
+- **Default timeout:** 30 seconds
+- **Solutions:**
+  - Reduce `--workers` count
+  - Check for tests that don't release users (missing cleanup)
+  - Increase acquireTimeout in pool config
+
+### "Test data from another test appearing"
+
+- **Cause:** Not using isolated user fixture
+- **Solution:** Switch to `isolatedAuthPage` fixture instead of `authenticatedPage`
+
+```typescript
+// Before (shared user - can have cross-contamination)
+test('my test', async ({ authenticatedPage }) => { ... });
+
+// After (isolated user - no cross-contamination)
+import { test } from '../fixtures/isolated-user.fixture';
+test('my test', async ({ isolatedAuthPage }) => { ... });
+```
+
+---
+
+## Cleanup Tracking Issues
+
+### "Cleanup failures in report"
+
+- **Severity:** Warning (not critical unless consistent)
+- **Cause:** Network issues, database connection, permission problems
+- **Note:** Retry logic handles most transient failures automatically (3 attempts)
+- **Action:** Investigate if same entity fails repeatedly
+
+### "Silent cleanup failures"
+
+- **Check:** Are you using the enhanced cleanup tracker?
+- **Debug:** Add logging after tests to see failures
+
+```typescript
+// In your test or afterEach hook:
+if (tracker.hasFailures()) {
+  console.log(tracker.getFailureReport());
+}
+```
+
+### "Resources not being cleaned up"
+
+- **Check:** Are you calling `tracker.track()` for created resources?
+- **Check:** Is `tracker.cleanup()` being called in afterEach/afterAll?
+- **Debug:** Log `tracker.getAll()` to see what's being tracked
+
+---
+
+## Debug Commands
+
+Use these in your tests or Node REPL to diagnose issues:
+
+| Issue | Debug Command |
+|-------|---------------|
+| Check timeout values | `console.log(getTimeout('navigation'))` |
+| Check CI multiplier | `console.log(CI_TIMEOUT_MULTIPLIER)` |
+| Check user pool status | `console.log(getUserPool().getStatus())` |
+| Check cleanup failures | `console.log(tracker.getFailureReport())` |
+| Check tracked resources | `console.log(tracker.getAll())` |
+| List all pool users | `console.log(getUserPool().getAllUsers())` |
+
+**Example debug session:**
+
+```typescript
+import { getTimeout, CI_TIMEOUT_MULTIPLIER } from '../config/timeouts';
+import { getUserPool } from '../utils/user-pool';
+
+// Check timeout configuration
+console.log('Navigation timeout:', getTimeout('navigation'));
+console.log('CI multiplier:', CI_TIMEOUT_MULTIPLIER);
+
+// Check user pool state
+const pool = getUserPool();
+console.log('Pool status:', pool.getStatus());
+// Output: { total: 10, available: 8, inUse: 2 }
+```
+
+---
+
 ## Still Stuck?
 
 1. **Check the full docs:** [GUIDE.md](GUIDE.md)
@@ -368,3 +489,7 @@ lsof -ti:3002 | xargs kill -9
 ---
 
 *Remember: Most problems are either "app not running" or "dependencies not installed." Start there!*
+
+---
+
+*Last updated: January 2025 (Hardening Phase Complete)*

@@ -21,6 +21,10 @@ TestHub/
 │       └── _template.project.ts  # Template for new projects
 │
 ├── src/
+│   ├── config/                   # Centralized configuration
+│   │   ├── index.ts
+│   │   └── timeouts.ts           # Timeout constants with CI multiplier
+│   │
 │   ├── contracts/                # API schemas (Zod)
 │   │   ├── index.ts
 │   │   └── studytab/
@@ -33,6 +37,7 @@ TestHub/
 │   │   ├── api.fixture.ts        # API client fixture
 │   │   ├── cleanup.fixture.ts    # Cleanup tracking fixture
 │   │   ├── db-snapshot.fixture.ts
+│   │   ├── isolated-user.fixture.ts  # User pool fixture
 │   │   └── performance.fixture.ts
 │   │
 │   ├── page-objects/             # Page Object Model
@@ -54,24 +59,30 @@ TestHub/
 │   │   └── discord-reporter.ts   # Discord notifications
 │   │
 │   └── utils/                    # Utility functions
-│       ├── api-client.ts         # HTTP client wrapper
+│       ├── api-client.ts         # HTTP client wrapper (with retry)
 │       ├── api-seeder.ts         # API-based data seeding
 │       ├── seed-helpers.ts       # Seeding convenience functions
-│       ├── cleanup-tracker.ts    # Test data cleanup
+│       ├── cleanup-tracker.ts    # Test data cleanup (with failure tracking)
 │       ├── contract-validator.ts # API contract validation
 │       ├── db-snapshot.ts        # Database snapshot/restore
 │       ├── performance-budget.ts # Performance measurement
+│       ├── retry.ts              # Retry utility with exponential backoff
+│       ├── user-pool.ts          # User pool for parallel isolation
 │       └── test-data-factory.ts  # Fake data generation
 │
 ├── tests/
 │   ├── auth.setup.ts             # Global auth setup
 │   ├── e2e/                      # End-to-end tests
 │   │   └── studytab/
-│   │       ├── auth/
+│   │       ├── auth/             # Login, register, edge cases
 │   │       ├── decks/
 │   │       ├── study/
 │   │       ├── settings/
 │   │       └── critical-paths/
+│   ├── security/                 # Security tests
+│   │   └── studytab/
+│   │       ├── xss-prevention.spec.ts
+│   │       └── auth-boundaries.spec.ts
 │   ├── api/                      # API tests
 │   │   └── studytab/
 │   │       └── contracts/        # Contract tests
@@ -440,6 +451,196 @@ isolatedTest('auto-isolated', async ({ page }) => {
   // Automatic snapshot before, restore after
 });
 ```
+
+---
+
+## Hardening Utilities
+
+These utilities were added to improve test reliability, reduce flakiness, and enhance security testing.
+
+### Centralized Timeouts
+
+**Location:** `src/config/timeouts.ts`
+
+All timeout values are centralized with automatic CI environment adjustment:
+
+```typescript
+import { getTimeout, TIMEOUTS } from '../config/timeouts';
+
+// Available timeout keys and default values:
+// - navigation: 15000ms   (page navigation)
+// - pageLoad: 30000ms     (full page load)
+// - elementVisible: 5000ms (element visibility)
+// - elementHidden: 5000ms  (element disappearance)
+// - animation: 1000ms      (animation completion)
+// - apiResponse: 10000ms   (API response)
+// - apiRetry: 3000ms       (delay between retries)
+// - login: 10000ms         (login process)
+// - logout: 5000ms         (logout process)
+// - fileUpload: 30000ms    (file uploads)
+// - aiGeneration: 60000ms  (AI operations)
+
+// Use getTimeout() to apply CI multiplier automatically
+await page.waitForSelector(selector, { timeout: getTimeout('elementVisible') });
+await page.waitForURL('**/dashboard**', { timeout: getTimeout('navigation') });
+
+// CI_TIMEOUT_MULTIPLIER is 1.5x when process.env.CI is set
+// This helps prevent flaky tests in slower CI environments
+```
+
+### API Retry Utility
+
+**Location:** `src/utils/retry.ts`
+
+Provides exponential backoff retry logic for transient failures:
+
+```typescript
+import { withRetry, withApiRetry } from '../utils/retry';
+
+// Generic retry wrapper
+const result = await withRetry(
+  () => fetchData(),
+  {
+    maxRetries: 3,        // Default: 3
+    initialDelay: 1000,   // Default: 1000ms
+    maxDelay: 10000,      // Default: 10000ms
+    backoffMultiplier: 2, // Default: 2
+    retryableStatuses: [408, 429, 500, 502, 503, 504], // Default
+    onRetry: (error, attempt) => console.log(`Retry ${attempt}: ${error.message}`),
+  }
+);
+
+// Pre-configured for API calls (includes logging)
+const data = await withApiRetry(() => apiClient.get('/decks'));
+
+// API client methods now have built-in retry support
+const decks = await apiClient.get('/decks'); // Retries enabled by default
+const deck = await apiClient.get('/decks/123', { retry: false }); // Disable retry
+const result = await apiClient.post('/decks', data, { retry: true }); // Enable for POST
+```
+
+**Retry behavior:**
+- GET, PUT, DELETE: Retry enabled by default
+- POST, PATCH: Retry disabled by default (not idempotent)
+- Retries on: 5xx errors, 408 (timeout), 429 (rate limit), network errors
+
+### User Pool for Parallel Isolation
+
+**Location:** `src/utils/user-pool.ts`
+
+Provides isolated test users for parallel test execution, preventing cross-test contamination:
+
+```typescript
+import { getUserPool, resetUserPool } from '../utils/user-pool';
+
+// Get the singleton pool instance
+const pool = getUserPool({
+  poolSize: 10,                              // Default: 10
+  emailPattern: 'testuser{n}@example.com',   // Default pattern
+  defaultPassword: 'Test123!',               // Default password
+});
+
+// Acquire a user for exclusive use
+const user = pool.acquire(workerId);
+// user: { id: 'user-1', email: 'testuser1@example.com', password: 'Test123!', ... }
+
+// Release when done
+pool.release(user.id);
+
+// Release all users for a worker (useful in afterAll)
+pool.releaseByWorker(workerId);
+
+// Check pool status
+const status = pool.getStatus();
+// { total: 10, available: 8, inUse: 2 }
+
+// Reset pool (for testing the pool itself)
+resetUserPool();
+```
+
+**Pre-configured users:** `testuser1@example.com` through `testuser10@example.com`
+
+> **Note:** These users must exist in your test database. Create them via seed script.
+
+### Isolated User Fixture
+
+**Location:** `src/fixtures/isolated-user.fixture.ts`
+
+Provides test fixtures that automatically manage user pool lifecycle:
+
+```typescript
+import { test, expect } from '../fixtures';
+// Or specifically:
+import { isolatedUserTest as test } from '../fixtures';
+
+test('parallel-safe test', async ({ isolatedUser, isolatedAuthPage }) => {
+  // isolatedUser: Unique user acquired for this worker
+  console.log(`Running as ${isolatedUser.email}`);
+
+  // isolatedAuthPage: Page already logged in with isolatedUser
+  await isolatedAuthPage.goto('/dashboard');
+  await expect(isolatedAuthPage).toHaveURL(/dashboard/);
+});
+
+// User is automatically released after the test
+```
+
+**Available fixtures:**
+- `isolatedUser` - The acquired `PoolUser` object with credentials
+- `isolatedAuthPage` - A Playwright `Page` pre-authenticated with the isolated user
+
+### Enhanced Cleanup Tracker
+
+**Location:** `src/utils/cleanup-tracker.ts`
+
+Enhanced with failure tracking and automatic retry:
+
+```typescript
+import { createCleanupTracker } from '../utils/cleanup-tracker';
+
+const tracker = createCleanupTracker();
+
+// Track resources as before
+tracker.track({
+  type: 'deck',
+  id: 'deck-123',
+  deleteVia: 'api',
+  deletePath: '/api/v1/decks/deck-123',
+});
+
+// Cleanup now retries failed deletions (3 attempts, 1s delay)
+await tracker.cleanup(page, apiContext);
+
+// Check for failures
+if (tracker.hasFailures()) {
+  // Get failure details
+  const failures = tracker.getFailures();
+  // [{ resource, error, timestamp, retryCount }, ...]
+
+  // Get formatted report (useful for CI logs)
+  console.log(tracker.getFailureReport());
+  // === Cleanup Failure Report ===
+  // - deck (deck-123): HTTP 500 Internal Server Error
+  //   Retries: 3, Time: 2024-01-15T10:30:00.000Z
+
+  // Clear failures for next test
+  tracker.clearFailures();
+}
+```
+
+**New methods:**
+| Method | Description |
+|--------|-------------|
+| `hasFailures()` | Returns `true` if any cleanups failed |
+| `getFailures()` | Returns array of `FailedCleanup` objects |
+| `getFailureReport()` | Returns formatted string report |
+| `clearFailures()` | Clears the failures array |
+
+**Retry behavior:**
+- 3 attempts per resource
+- 1 second delay between attempts
+- Continues with other resources even if one fails
+- All failures are tracked for reporting
 
 ---
 

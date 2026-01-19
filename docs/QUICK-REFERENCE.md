@@ -91,6 +91,7 @@
 | **Visual** | UI/CSS changes | `npm run test:visual` | 5 min |
 | **A11y** | New UI features | `npm run test:a11y` | 3 min |
 | **Perf** | Weekly baseline | `npm run test:perf` | 5 min |
+| **Security** | Security validation | `npm run test:security` | 5 min |
 
 ---
 
@@ -115,4 +116,73 @@
 
 ---
 
+## New Utility Imports
+
+### Timeouts
+
+```typescript
+import { getTimeout, TIMEOUTS } from '../config';
+
+// Usage
+await page.waitForSelector(selector, { timeout: getTimeout('elementVisible') });
+await page.goto(url, { timeout: getTimeout('navigation') });
+```
+
+### API Retry
+
+```typescript
+import { withApiRetry } from '../utils/retry';
+
+// Usage - automatically retries on transient failures
+const data = await withApiRetry(() => apiClient.get('/decks'));
+```
+
+### User Pool
+
+```typescript
+import { getUserPool } from '../utils/user-pool';
+
+// Usage
+const pool = getUserPool();
+const user = pool.acquire(workerId);
+// ... use user ...
+pool.release(user.id);
+```
+
+### Isolated User Fixture
+
+```typescript
+import { test } from '../fixtures/isolated-user.fixture';
+
+// Usage - each worker gets unique user automatically
+test('isolated test', async ({ isolatedAuthPage }) => {
+  // isolatedAuthPage is already logged in with a unique user
+});
+```
+
+### Cleanup Tracker (Enhanced)
+
+```typescript
+// New methods available
+tracker.hasFailures()      // Returns true if any cleanup failed
+tracker.getFailures()      // Returns array of failure objects
+tracker.getFailureReport() // Returns formatted string for CI
+tracker.clearFailures()    // Clears the failure list
+```
+
+---
+
+## Common Patterns
+
+| Task | Solution |
+|------|----------|
+| Parallel test isolation | Use `isolatedAuthPage` fixture |
+| Handle flaky APIs | Wrap calls with `withApiRetry()` |
+| Check cleanup health | Call `tracker.hasFailures()` after test |
+| Consistent timeouts | Use `getTimeout('key')` instead of hardcoded values |
+| CI-friendly timeouts | Automatic 1.5x multiplier when `CI=true` |
+
+---
+
 *Keep this handy! Full docs at: `docs/testhub/GUIDE.md`*
+*Updated: January 2025 (Hardening Phase)*
