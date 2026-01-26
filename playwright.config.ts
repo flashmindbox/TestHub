@@ -60,6 +60,16 @@ export default defineConfig({
       },
     },
 
+    // CoApp API tests
+    {
+      name: 'coapp-api',
+      testDir: './tests/api/coapp',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: process.env.COAPP_API_URL || 'http://localhost:4001',
+      },
+    },
+
     // Unit tests (no browser needed)
     {
       name: 'unit',

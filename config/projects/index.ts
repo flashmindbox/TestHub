@@ -1,9 +1,11 @@
 import { ProjectConfig } from '../../src/types';
 import { studytabProject } from './studytab.project';
+import { coappProject } from './coapp.project';
 
 // Registry of all projects
 const projects: Record<string, ProjectConfig> = {
   studytab: studytabProject,
+  coapp: coappProject,
 };
 
 /**
@@ -58,4 +60,4 @@ export function getProjectEnv(projectName: string, env: string = 'local') {
   };
 }
 
-export { studytabProject };
+export { studytabProject, coappProject };
