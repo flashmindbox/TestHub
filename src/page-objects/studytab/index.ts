@@ -9,6 +9,7 @@ export { DecksPage } from './decks.page';
 export { DeckDetailPage } from './deck-detail.page';
 export { StudyPage } from './study.page';
 export { SettingsPage } from './settings.page';
+export { SchedulerSettingsPage } from './scheduler-settings.page';
 export { ProfilePage } from './profile.page';
 export { PomodoroPage } from './pomodoro.page';
 
@@ -25,6 +26,7 @@ import { DecksPage } from './decks.page';
 import { DeckDetailPage } from './deck-detail.page';
 import { StudyPage } from './study.page';
 import { SettingsPage } from './settings.page';
+import { SchedulerSettingsPage } from './scheduler-settings.page';
 import { ProfilePage } from './profile.page';
 import { PomodoroPage } from './pomodoro.page';
 
@@ -38,6 +40,7 @@ export function createStudyTabPages(page: Page, baseUrl: string) {
     deckDetail: new DeckDetailPage(page, baseUrl),
     study: new StudyPage(page, baseUrl),
     settings: new SettingsPage(page, baseUrl),
+    schedulerSettings: new SchedulerSettingsPage(page, baseUrl),
     profile: new ProfilePage(page, baseUrl),
     pomodoro: new PomodoroPage(page, baseUrl),
   };
