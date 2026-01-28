@@ -17,3 +17,6 @@ export * from './tenant.schemas';
 
 // Health schemas
 export * from './health.schemas';
+
+// Student schemas
+export * from './student.schemas';
