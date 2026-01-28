@@ -21,10 +21,10 @@ export const coappProject: ProjectConfig = {
   },
 
   auth: {
-    strategy: 'session',
-    loginPath: '/auth/login',
-    logoutPath: '/auth/logout',
-    cookieName: 'better-auth.session_token',
+    strategy: 'jwt',
+    loginPath: '/login',
+    logoutPath: '/logout',
+    cookieName: 'coapp_token',
     testUsers: {
       // Starter plan tenant
       starterAdmin: {
@@ -77,9 +77,9 @@ export const coappProject: ProjectConfig = {
     },
     routes: {
       auth: {
-        login: '/auth/login',
-        register: '/auth/register',
-        forgotPassword: '/auth/forgot-password',
+        login: '/login',
+        register: '/register',
+        forgotPassword: '/forgot-password',
       },
       dashboard: '/dashboard',
       students: {

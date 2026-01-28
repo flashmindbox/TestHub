@@ -70,6 +70,16 @@ export default defineConfig({
       },
     },
 
+    // CoApp E2E tests
+    {
+      name: 'coapp-e2e',
+      testDir: './tests/e2e/coapp',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: process.env.COAPP_WEB_URL || 'http://localhost:4000',
+      },
+    },
+
     // Unit tests (no browser needed)
     {
       name: 'unit',
