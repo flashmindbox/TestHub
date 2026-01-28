@@ -14,6 +14,7 @@
     "test:smoke": "playwright test --grep @smoke",
     "test:critical": "playwright test --grep @critical",
     "test:studytab": "playwright test --grep @studytab",
+    "test:coapp": "playwright test --project=coapp-api",
     "test:auth": "playwright test --grep @auth",
     "test:local": "cross-env ENV=local playwright test",
     "test:staging": "cross-env ENV=staging playwright test",
