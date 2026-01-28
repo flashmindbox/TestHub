@@ -17,8 +17,8 @@ test.describe('CoApp Authentication @coapp @auth', () => {
   });
 
   test('should login with valid credentials', async ({ page }) => {
-    // Use test account created during manual testing
-    await loginPage.login('alpha@example.com', 'password123');
+    // Use seeded test account
+    await loginPage.login('testuser@coapp.test', 'Test123!');
     await expect(page).toHaveURL(/.*dashboard/);
   });
 

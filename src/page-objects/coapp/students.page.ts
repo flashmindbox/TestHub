@@ -13,7 +13,8 @@ export class StudentsPage extends BasePage {
     super(page);
     this.addStudentButton = page.getByRole('link', { name: 'Add Student' });
     this.searchInput = page.getByRole('textbox', { name: /search/i });
-    this.statusFilter = page.getByRole('combobox');
+    // Use first() to avoid matching pagination combobox
+    this.statusFilter = page.getByRole('combobox').first();
     this.studentTable = page.getByRole('table');
     this.emptyState = page.getByText('No students found');
     this.paginationInfo = page.getByText(/showing|no students/i);
@@ -37,7 +38,14 @@ export class StudentsPage extends BasePage {
 
   async filterByStatus(status: 'ALL' | 'ACTIVE' | 'INACTIVE' | 'PASSED_OUT') {
     await this.statusFilter.click();
-    await this.page.getByRole('option', { name: status === 'ALL' ? 'All Status' : status }).click();
+    // Map enum values to display names (exact match)
+    const displayNames: Record<string, string> = {
+      'ALL': 'All Status',
+      'ACTIVE': 'Active',
+      'INACTIVE': 'Inactive',
+      'PASSED_OUT': 'Passed Out',
+    };
+    await this.page.getByRole('option', { name: displayNames[status], exact: true }).click();
     await this.page.waitForLoadState('networkidle');
   }
 
@@ -66,7 +74,14 @@ export class StudentsPage extends BasePage {
   async clickViewStudent(name: string) {
     const row = this.studentTable.getByRole('row', { name: new RegExp(name) });
     await row.getByRole('link').click();
-    await this.page.waitForURL(/\/students\/[a-z0-9]+/);
+    await this.page.waitForURL(/\/students\/[a-z0-9-]+/);
+  }
+
+  async clickFirstStudent() {
+    const rows = await this.getStudentRows();
+    const firstRow = rows.first();
+    await firstRow.getByRole('link').first().click();
+    await this.page.waitForURL(/\/students\/[a-z0-9-]+/);
   }
 }
 
@@ -123,7 +138,8 @@ export class StudentFormPage extends BasePage {
 
     // Navigation
     this.backButton = page.getByRole('button', { name: /back/i });
-    this.nextButton = page.getByRole('button', { name: /next/i });
+    // Use first() as multi-step form may have multiple Next buttons (hidden/visible)
+    this.nextButton = page.getByRole('button', { name: 'Next', exact: true }).first();
     this.submitButton = page.getByRole('button', { name: /create student/i });
   }
 
