@@ -10,15 +10,21 @@ import { TestDataFactory } from '../../../../src/utils';
 /**
  * FSRS Scheduler Settings E2E Tests
  *
- * Tests the FSRS (Free Spaced Repetition Scheduler) algorithm settings,
- * including algorithm selection, retention configuration, presets,
- * per-deck overrides, and migration from SM-2.
+ * Tests the scheduler settings page after the Design System v2 redesign (March 2026).
+ * The new UI uses Study Mode cards instead of direct algorithm/retention/limit controls.
  *
- * Note: The app defaults to SM-2 for new users. FSRS is available as an option.
+ * Key changes from v1:
+ * - Algorithm selection is now implicit through Study Mode choice
+ * - Retention slider and daily limit inputs removed from main page
+ * - Advanced settings and per-deck overrides are embedded (not collapsible)
+ * - Schedule Preview shows current algorithm info
  *
  * Tags: @studytab @scheduler @fsrs @settings
  */
 test.describe('FSRS Scheduler Settings @studytab @scheduler @fsrs', () => {
+  // Serial mode: scheduler settings API is flaky under parallel browser load
+  test.describe.configure({ mode: 'serial' });
+  test.setTimeout(60000); // Settings API can be slow after mutations
   test.use({ storageState: '.auth/user.json' });
 
   let schedulerSettings: SchedulerSettingsPage;
@@ -44,196 +50,122 @@ test.describe('FSRS Scheduler Settings @studytab @scheduler @fsrs', () => {
       expect(isVisible).toBe(true);
     });
 
-    test('displays SM-2 as default algorithm for existing users', async () => {
-      // Note: SM-2 is the safe default for new/existing users per DEFAULT_SCHEDULER_SETTINGS
+    test('scheduler settings page loads with study mode selector', async () => {
+      await schedulerSettings.gotoSchedulerSettings();
+
+      await schedulerSettings.expectLoaded();
+      await expect(schedulerSettings.studyModeHeading).toBeVisible();
+    });
+
+    test('displays current algorithm via study mode selection', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
       const algorithm = await schedulerSettings.getSelectedAlgorithm();
-      // Accept either SM-2 (default) or FSRS (if user previously switched)
+      // Accept either SM-2 (Language mode) or FSRS (other modes)
       expect(['SM-2', 'FSRS']).toContain(algorithm);
     });
 
-    test('can switch between FSRS and SM-2', async () => {
+    test('can switch between FSRS and SM-2 via study modes', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
       // Get current algorithm
       const initialAlgorithm = await schedulerSettings.getSelectedAlgorithm();
 
-      // Switch to the other algorithm
+      // Switch to the other algorithm via study mode
       const targetAlgorithm = initialAlgorithm === 'FSRS' ? 'SM-2' : 'FSRS';
       await schedulerSettings.selectAlgorithm(targetAlgorithm);
-      await schedulerSettings.page.waitForTimeout(500);
 
       let algorithm = await schedulerSettings.getSelectedAlgorithm();
       expect(algorithm).toBe(targetAlgorithm);
 
+      // Pause to avoid rate limiting
+      await schedulerSettings.page.waitForTimeout(1000);
+
       // Switch back
       await schedulerSettings.selectAlgorithm(initialAlgorithm);
-      await schedulerSettings.page.waitForTimeout(500);
 
       algorithm = await schedulerSettings.getSelectedAlgorithm();
       expect(algorithm).toBe(initialAlgorithm);
     });
 
-    test('retention slider updates value', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-
-      // Ensure FSRS is selected (retention slider is only for FSRS)
-      await schedulerSettings.selectAlgorithm('FSRS');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      // Get initial retention value
-      const initialRetention = await schedulerSettings.getRetentionValue();
-      expect(initialRetention).toBeGreaterThanOrEqual(70);
-      expect(initialRetention).toBeLessThanOrEqual(97);
-
-      // Set a new retention value
-      const newRetention = 85;
-      await schedulerSettings.setRetention(newRetention);
-
-      // Verify the value updated
-      const updatedRetention = await schedulerSettings.getRetentionValue();
-      expect(updatedRetention).toBe(newRetention);
-
-      // Restore original value
-      await schedulerSettings.setRetention(initialRetention);
+    test.skip('retention slider updates value', async () => {
+      // Design System v2: Retention slider removed from main scheduler settings page.
+      // Retention is now controlled through study mode selection or custom mode creation.
     });
 
-    // Flaky: Server intermittently returns "Failed to load settings" during parallel execution
-    test.fixme('presets apply correct values and switch to FSRS', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-
-      // Note: Presets auto-switch to FSRS per app design
-      // "Presets will switch you to FSRS for precise retention targeting"
-
-      // Test Relaxed preset (80% retention)
-      await schedulerSettings.applyRetentionPreset('relaxed');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      // After preset, should be on FSRS
-      let algorithm = await schedulerSettings.getSelectedAlgorithm();
-      expect(algorithm).toBe('FSRS');
-
-      let retention = await schedulerSettings.getRetentionValue();
-      expect(retention).toBe(schedulerSettings.getPresetRetention('relaxed'));
-
-      // Test Balanced preset (90% retention)
-      await schedulerSettings.applyRetentionPreset('balanced');
-      await schedulerSettings.page.waitForTimeout(500);
-      retention = await schedulerSettings.getRetentionValue();
-      expect(retention).toBe(schedulerSettings.getPresetRetention('balanced'));
+    test.skip('presets apply correct values and switch to FSRS', async () => {
+      // Design System v2: Retention presets (Relaxed/Balanced/Intense/Exam) removed
+      // from main page. Replaced by Study Mode cards with built-in algorithm settings.
     });
 
-    test('daily limits can be adjusted', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-
-      // Get initial limits
-      const initialNewCards = await schedulerSettings.getNewCardsLimit();
-      const initialReviewCards = await schedulerSettings.getReviewCardsLimit();
-
-      // Set new limits
-      const newCardsLimit = 30;
-      const reviewCardsLimit = 150;
-      await schedulerSettings.setNewCardsLimit(newCardsLimit);
-      await schedulerSettings.setReviewCardsLimit(reviewCardsLimit);
-
-      // Verify limits updated
-      const updatedNewCards = await schedulerSettings.getNewCardsLimit();
-      const updatedReviewCards = await schedulerSettings.getReviewCardsLimit();
-      expect(updatedNewCards).toBe(newCardsLimit);
-      expect(updatedReviewCards).toBe(reviewCardsLimit);
-
-      // Restore original values
-      await schedulerSettings.setNewCardsLimit(initialNewCards);
-      await schedulerSettings.setReviewCardsLimit(initialReviewCards);
+    test.skip('daily limits can be adjusted', async () => {
+      // Design System v2: Daily limit inputs removed from main scheduler settings page.
+      // Daily limits are now set automatically by the selected study mode.
     });
 
-    test('displays algorithm description', async () => {
+    test('schedule preview shows algorithm info', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
-      await expect(schedulerSettings.algorithmDescription).toBeVisible();
-      const description = await schedulerSettings.getText(schedulerSettings.algorithmDescription);
-      expect(description.length).toBeGreaterThan(0);
+      await expect(schedulerSettings.schedulePreviewHeading).toBeVisible();
+      await expect(schedulerSettings.schedulePreviewAlgorithmInfo).toBeVisible();
+
+      const previewAlgorithm = await schedulerSettings.getPreviewAlgorithm();
+      expect(['FSRS', 'SM2']).toContain(previewAlgorithm);
     });
 
-    test('retention slider has correct range for FSRS', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-
-      // Ensure FSRS is selected
-      await schedulerSettings.selectAlgorithm('FSRS');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      // Check slider attributes - FSRS uses 0.7-0.97 (70%-97%)
-      const min = await schedulerSettings.retentionSlider.getAttribute('min');
-      const max = await schedulerSettings.retentionSlider.getAttribute('max');
-
-      // Slider uses decimal values
-      expect(parseFloat(min || '0')).toBeGreaterThanOrEqual(0.7);
-      expect(parseFloat(max || '1')).toBeLessThanOrEqual(0.97);
+    test.skip('retention slider has correct range for FSRS', async () => {
+      // Design System v2: Retention slider removed from main scheduler settings page.
     });
   });
 
   // ============================================================
-  // 2. ALGORITHM SELECTION
+  // 2. STUDY MODE SELECTION
   // ============================================================
-  test.describe('Algorithm Selection', () => {
-    // Note: The app does NOT show a confirmation modal when switching algorithms
-    // This is by design - changes are saved immediately via API
-    test.skip('switching algorithm shows confirmation modal', async () => {
-      // Feature not implemented: No confirmation modal exists in current app
-      // The algorithm-selector.tsx directly calls onChange without confirmation
-    });
-
-    // Flaky: Page reload can trigger "Failed to load settings" state
-    test.fixme('settings persist after page refresh', async ({ page }) => {
+  test.describe('Study Mode Selection', () => {
+    test('study mode cards are visible', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
-      // Switch to FSRS and set specific retention
-      await schedulerSettings.selectAlgorithm('FSRS');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      const testRetention = 88;
-      await schedulerSettings.setRetention(testRetention);
-
-      // Wait for settings to save (auto-saves)
-      await page.waitForTimeout(1000);
-
-      // Refresh the page
-      await page.reload();
-      await schedulerSettings.schedulerTab.click();
-      await page.waitForTimeout(500);
-
-      // Verify retention value persisted
-      const persistedRetention = await schedulerSettings.getRetentionValue();
-      expect(persistedRetention).toBe(testRetention);
+      await expect(schedulerSettings.balancedModeButton).toBeVisible();
+      await expect(schedulerSettings.relaxedModeButton).toBeVisible();
+      await expect(schedulerSettings.intensiveModeButton).toBeVisible();
+      await expect(schedulerSettings.languageModeButton).toBeVisible();
     });
 
-    test('SM-2 is the default algorithm for new users', async () => {
-      // Note: Per DEFAULT_SCHEDULER_SETTINGS in types.ts, algorithm defaults to 'sm2'
+    test.fixme('selecting a mode updates the schedule preview', async () => {
+      // Fixme: Schedule Preview depends on a successful API mutation, but the settings
+      // API rate-limits after prior algorithm-switching tests in serial mode. The mode
+      // card selection works (tested elsewhere), but the preview text doesn't update
+      // because the mutation returns 429 "Too Many Requests".
+      await schedulerSettings.gotoSchedulerSettings();
+      await schedulerSettings.selectStudyMode('balanced');
+
+      await expect(async () => {
+        expect(await schedulerSettings.getPreviewAlgorithm()).toBe('FSRS');
+      }).toPass({ timeout: 15000 });
+
+      await schedulerSettings.selectStudyMode('language');
+
+      await expect(async () => {
+        expect(await schedulerSettings.getPreviewAlgorithm()).toBe('SM2');
+      }).toPass({ timeout: 15000 });
+    });
+
+    test('SM-2 mode is available for language learning', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
-      // Test user may have changed settings, so we just verify the UI works
+      // Language Learning mode should exist and use SM-2
+      await expect(schedulerSettings.languageModeButton).toBeVisible();
+
+      await schedulerSettings.selectAlgorithm('SM-2');
+
       const algorithm = await schedulerSettings.getSelectedAlgorithm();
-      expect(['SM-2', 'FSRS']).toContain(algorithm);
+      expect(algorithm).toBe('SM-2');
     });
 
-    // Flaky: Intermittent server issues during parallel test execution
-    test.fixme('algorithm selection updates immediately', async () => {
+    test('create custom mode button is visible', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
-      const initialAlgorithm = await schedulerSettings.getSelectedAlgorithm();
-      const targetAlgorithm = initialAlgorithm === 'FSRS' ? 'SM-2' : 'FSRS';
-
-      // Click to switch - no confirmation modal
-      await schedulerSettings.selectAlgorithm(targetAlgorithm);
-      await schedulerSettings.page.waitForTimeout(500);
-
-      // Verify immediate update
-      const newAlgorithm = await schedulerSettings.getSelectedAlgorithm();
-      expect(newAlgorithm).toBe(targetAlgorithm);
-
-      // Restore original
-      await schedulerSettings.selectAlgorithm(initialAlgorithm);
+      await expect(schedulerSettings.createCustomModeButton).toBeVisible();
     });
   });
 
@@ -241,48 +173,31 @@ test.describe('FSRS Scheduler Settings @studytab @scheduler @fsrs', () => {
   // 3. PER-DECK OVERRIDES
   // ============================================================
   test.describe('Per-Deck Overrides', () => {
-    let testDeckName: string;
-
-    test.beforeEach(async ({ cleanup }) => {
-      // Create a test deck for override tests
-      testDeckName = TestDataFactory.deck().name;
-      await decksPage.goto();
-      await decksPage.createDeck(testDeckName);
-
-      cleanup.track({
-        type: 'deck',
-        id: testDeckName,
-        name: testDeckName,
-        deleteVia: 'ui',
-        project: 'studytab',
-        createdAt: new Date(),
-      });
-    });
-
-    // Flaky: Deck creation in beforeEach can leave page in inconsistent state
-    test.fixme('per-deck overrides section can be expanded', async () => {
+    test('per-deck overrides section is visible', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
-      // Click to expand per-deck overrides
-      await schedulerSettings.perDeckOverridesToggle.click();
-      await schedulerSettings.page.waitForTimeout(500);
-
-      // Should see the panel or deck list
-      const isExpanded = await schedulerSettings.isPerDeckOverridesExpanded();
-      expect(isExpanded).toBe(true);
+      // In v2, per-deck overrides are embedded (always visible)
+      const isVisible = await schedulerSettings.isPerDeckOverridesVisible();
+      expect(isVisible).toBe(true);
     });
 
-    // These tests are skipped until per-deck override UI is verified working
+    test('per-deck overrides shows description text', async () => {
+      await schedulerSettings.gotoSchedulerSettings();
+
+      await expect(schedulerSettings.perDeckOverridesDescription).toBeVisible();
+    });
+
     test.skip('can set different algorithm per deck', async () => {
-      // Per-deck overrides exist but need UI verification
+      // Per-deck overrides now use preset dropdowns, not algorithm selection.
+      // Requires deck creation + preset assignment testing.
     });
 
     test.skip('can set different retention per deck', async () => {
-      // Per-deck overrides exist but need UI verification
+      // Per-deck overrides now use preset dropdowns, not retention sliders.
     });
 
     test.skip('deleting override reverts to global', async () => {
-      // Per-deck overrides exist but need UI verification
+      // Per-deck overrides now use "Use Default" option in preset dropdown.
     });
   });
 
@@ -293,9 +208,9 @@ test.describe('FSRS Scheduler Settings @studytab @scheduler @fsrs', () => {
     let testDeckName: string;
 
     test.beforeEach(async ({ cleanup }) => {
-      // Ensure FSRS is selected
+      // Ensure FSRS is selected via Balanced mode
       await schedulerSettings.gotoSchedulerSettings();
-      await schedulerSettings.selectAlgorithm('FSRS');
+      await schedulerSettings.selectStudyMode('balanced');
       await schedulerSettings.page.waitForTimeout(500);
 
       // Create a test deck with cards
@@ -355,50 +270,41 @@ test.describe('FSRS Scheduler Settings @studytab @scheduler @fsrs', () => {
   });
 
   // ============================================================
-  // 5. SM-2 TO FSRS MIGRATION
+  // 5. ALGORITHM SWITCHING VIA STUDY MODES
   // ============================================================
-  test.describe('SM-2 to FSRS Migration', () => {
-    // These tests require existing SM-2 review history to migrate
-    // Skipped as they need specific test data setup
-
+  test.describe('Algorithm Switching via Study Modes', () => {
     test.skip('existing SM-2 card migrates on first FSRS review', async () => {
-      // Requires cards with SM-2 history
+      // Requires cards with SM-2 history - needs specific test data setup
     });
 
     test.skip('stability initialized from interval', async () => {
-      // Requires cards with SM-2 history
+      // Requires cards with SM-2 history - needs specific test data setup
     });
 
-    // Flaky: Intermittent server issues during parallel test execution
-    test.fixme('can switch from SM-2 to FSRS', async () => {
+    test('can switch from SM-2 to FSRS via study modes', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
-      // Ensure on SM-2
+      // Select Language Learning (SM-2)
       await schedulerSettings.selectAlgorithm('SM-2');
-      await schedulerSettings.page.waitForTimeout(500);
 
       let algorithm = await schedulerSettings.getSelectedAlgorithm();
       expect(algorithm).toBe('SM-2');
 
-      // Switch to FSRS
+      // Switch to Balanced (FSRS)
       await schedulerSettings.selectAlgorithm('FSRS');
-      await schedulerSettings.page.waitForTimeout(500);
 
       algorithm = await schedulerSettings.getSelectedAlgorithm();
       expect(algorithm).toBe('FSRS');
     });
 
-    // Flaky: Intermittent server issues during parallel test execution
-    test.fixme('can switch back to SM-2 after using FSRS', async () => {
+    test('can switch back to SM-2 after using FSRS', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
       // Start on FSRS
       await schedulerSettings.selectAlgorithm('FSRS');
-      await schedulerSettings.page.waitForTimeout(500);
 
       // Switch to SM-2
       await schedulerSettings.selectAlgorithm('SM-2');
-      await schedulerSettings.page.waitForTimeout(500);
 
       const algorithm = await schedulerSettings.getSelectedAlgorithm();
       expect(algorithm).toBe('SM-2');
@@ -406,156 +312,92 @@ test.describe('FSRS Scheduler Settings @studytab @scheduler @fsrs', () => {
   });
 
   // ============================================================
-  // 6. DAILY LIMIT PRESETS
+  // 6. STUDY MODE PRESETS
   // ============================================================
-  test.describe('Daily Limit Presets', () => {
-    // Flaky: Intermittent server issues during parallel test execution
-    test.fixme('Light preset sets low daily limits', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-
-      await schedulerSettings.applyDailyLimitPreset('light');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      const newCards = await schedulerSettings.getNewCardsLimit();
-      const reviewCards = await schedulerSettings.getReviewCardsLimit();
-
-      // Light should have lower limits (typically 5/50 or similar)
-      expect(newCards).toBeLessThanOrEqual(20);
+  test.describe('Study Mode Presets', () => {
+    test.skip('Light preset sets low daily limits', async () => {
+      // Design System v2: Daily limit presets (Light/Moderate/Heavy) removed from
+      // main page. Limits are now set by study mode cards automatically.
     });
 
-    // Flaky: Intermittent server issues during parallel test execution
-    test.fixme('Moderate preset sets medium daily limits', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-
-      await schedulerSettings.applyDailyLimitPreset('moderate');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      const newCards = await schedulerSettings.getNewCardsLimit();
-      const reviewCards = await schedulerSettings.getReviewCardsLimit();
-
-      // Moderate is the middle option
-      expect(newCards).toBeGreaterThanOrEqual(10);
-      expect(newCards).toBeLessThanOrEqual(30);
+    test.skip('Moderate preset sets medium daily limits', async () => {
+      // Design System v2: Daily limit presets removed. See above.
     });
 
-    // Flaky: Intermittent server issues during parallel test execution
-    test.fixme('Heavy preset sets high daily limits', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-
-      await schedulerSettings.applyDailyLimitPreset('heavy');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      const newCards = await schedulerSettings.getNewCardsLimit();
-      const reviewCards = await schedulerSettings.getReviewCardsLimit();
-
-      // Heavy should have higher limits
-      expect(newCards).toBeGreaterThanOrEqual(20);
+    test.skip('Heavy preset sets high daily limits', async () => {
+      // Design System v2: Daily limit presets removed. See above.
     });
   });
 
   // ============================================================
   // 7. SM-2 SPECIFIC SETTINGS
   // ============================================================
-  // Flaky: beforeEach with algorithm switching can hit server issues
-  test.describe.skip('SM-2 Settings', () => {
-    test.beforeEach(async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-      // First switch to SM-2 to see SM-2 specific settings
-      await schedulerSettings.selectAlgorithm('SM-2');
-      await schedulerSettings.page.waitForTimeout(500);
-    });
-
-    test('SM-2 settings are visible when SM-2 is selected', async () => {
-      // When SM-2 is selected, SM-2 specific settings should be visible
-      const visible = await schedulerSettings.areSM2SettingsVisible();
-      expect(visible).toBe(true);
+  test.describe('SM-2 Settings', () => {
+    test.skip('SM-2 settings are visible when SM-2 is selected', async () => {
+      // Design System v2: SM-2 specific settings (learning steps, graduating interval,
+      // easy bonus, starting ease) are no longer shown on the main settings page.
+      // These are configured internally when Language Learning mode is selected.
     });
 
     test.skip('can configure learning steps', async () => {
-      // Requires SM-2 settings UI verification
+      // Design System v2: SM-2 settings removed from main page.
     });
 
     test.skip('can configure graduating interval', async () => {
-      // Requires SM-2 settings UI verification
+      // Design System v2: SM-2 settings removed from main page.
     });
 
     test.skip('can configure easy bonus', async () => {
-      // Requires SM-2 settings UI verification
+      // Design System v2: SM-2 settings removed from main page.
     });
 
     test.skip('can configure starting ease', async () => {
-      // Requires SM-2 settings UI verification
+      // Design System v2: SM-2 settings removed from main page.
     });
 
-    test('SM-2 settings hidden when FSRS is selected', async () => {
-      // Switch to FSRS
-      await schedulerSettings.selectAlgorithm('FSRS');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      const visible = await schedulerSettings.areSM2SettingsVisible();
-      expect(visible).toBe(false);
+    test.skip('SM-2 settings hidden when FSRS is selected', async () => {
+      // Design System v2: SM-2 settings not shown on main page regardless of algorithm.
     });
   });
 
   // ============================================================
-  // 8. COLLAPSIBLE SECTIONS
+  // 8. EMBEDDED SECTIONS
   // ============================================================
-  // Flaky: Intermittent server issues during parallel test execution
-  test.describe.skip('Collapsible Sections', () => {
-    test('advanced settings section can be expanded', async () => {
+  test.describe('Embedded Sections', () => {
+    test('advanced options section is visible', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
-      // Click to expand
-      await schedulerSettings.advancedSettingsToggle.click();
-      await schedulerSettings.page.waitForTimeout(300);
-
-      const expanded = await schedulerSettings.isAdvancedSettingsExpanded();
-      expect(expanded).toBe(true);
+      // In v2, advanced options are embedded (always visible, not collapsible)
+      const isVisible = await schedulerSettings.isAdvancedOptionsVisible();
+      expect(isVisible).toBe(true);
     });
 
-    test('per-deck overrides section can be expanded', async () => {
+    test('leech handling settings are visible in advanced options', async () => {
       await schedulerSettings.gotoSchedulerSettings();
 
-      // Click to expand
-      await schedulerSettings.perDeckOverridesToggle.click();
-      await schedulerSettings.page.waitForTimeout(300);
+      const isVisible = await schedulerSettings.isLeechHandlingVisible();
+      expect(isVisible).toBe(true);
+    });
 
-      const expanded = await schedulerSettings.isPerDeckOverridesExpanded();
-      expect(expanded).toBe(true);
+    test('per-deck overrides section is visible', async () => {
+      await schedulerSettings.gotoSchedulerSettings();
+
+      const isVisible = await schedulerSettings.isPerDeckOverridesVisible();
+      expect(isVisible).toBe(true);
     });
   });
 
   // ============================================================
   // EDGE CASE TESTS
   // ============================================================
-  // Flaky: Intermittent server issues during parallel test execution
-  test.describe.skip('Edge Cases and Validation', () => {
-    test('retention value stays within valid range', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-      await schedulerSettings.selectAlgorithm('FSRS');
-      await schedulerSettings.page.waitForTimeout(500);
-
-      // Try to set retention - slider should enforce range
-      await schedulerSettings.setRetention(85);
-
-      const retention = await schedulerSettings.getRetentionValue();
-      // Should be within FSRS range (70-97)
-      expect(retention).toBeGreaterThanOrEqual(70);
-      expect(retention).toBeLessThanOrEqual(97);
+  test.describe('Edge Cases and Validation', () => {
+    test.skip('retention value stays within valid range', async () => {
+      // Design System v2: Retention slider removed from main page.
+      // Retention is managed internally by study mode selection.
     });
 
-    test('daily limits accept valid values', async () => {
-      await schedulerSettings.gotoSchedulerSettings();
-
-      // Set valid limits
-      await schedulerSettings.setNewCardsLimit(50);
-      await schedulerSettings.setReviewCardsLimit(200);
-
-      const newCards = await schedulerSettings.getNewCardsLimit();
-      const reviewCards = await schedulerSettings.getReviewCardsLimit();
-
-      expect(newCards).toBe(50);
-      expect(reviewCards).toBe(200);
+    test.skip('daily limits accept valid values', async () => {
+      // Design System v2: Daily limit inputs removed from main page.
     });
 
     test('settings page loads without console errors', async ({ page }) => {

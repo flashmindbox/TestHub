@@ -23,32 +23,17 @@ import {
 test.describe('Network Errors @studytab @error-handling', () => {
   test.use({ storageState: '.auth/user.json' });
 
-  // Note: This test is skipped because the app loads initial data on the server side,
-  // so aborting requests after navigation starts doesn't prevent the page from loading.
-  // The app also gracefully degrades to showing empty state when API fails.
-  test.skip('shows error when network request fails', async ({ page, projectConfig }) => {
-    // Intercept all API requests and abort them
-    await page.route('**/api/**', route => route.abort('failed'));
-    await page.route('**/v1/**', route => route.abort('failed'));
+  test('shows error when network request fails', async ({ page, projectConfig }) => {
+    // Abort data API calls but allow auth session checks through
+    await page.route('**/v1/decks**', route => route.abort('failed'));
+    await page.route('**/v1/study/**', route => route.abort('failed'));
 
-    // Navigate to decks page
+    // Navigate to decks page — React Query will get network errors
     await page.goto(`${projectConfig.baseUrl}/decks`);
-    await page.waitForTimeout(2000); // Wait for error to display
 
-    // Should show some error indication (toast, inline error, or error page)
-    const errorIndicators = page.locator('[role="alert"], .error, .error-message, [data-testid*="error"]');
-    const hasError = await errorIndicators.count() > 0;
-
-    // Or page might show offline/error text
-    const offlineIndicator = page.getByText(/offline|connection|network|failed|error/i);
-    const hasOffline = await offlineIndicator.count() > 0;
-
-    // Or page might just show empty state (graceful degradation)
-    const emptyState = page.getByText(/no decks/i);
-    const hasEmptyState = await emptyState.count() > 0;
-
-    // App should handle network failure somehow
-    expect(hasError || hasOffline || hasEmptyState).toBeTruthy();
+    // The decks page renders "Failed to load decks" when useDecks() errors
+    const errorText = page.getByText(/failed to load|couldn't.*load|error/i);
+    await expect(errorText.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('shows offline indicator when disconnected', async ({ page, projectConfig }) => {
@@ -86,24 +71,25 @@ test.describe('Network Errors @studytab @error-handling', () => {
     }
   });
 
-  test.skip('recovers gracefully when connection restored', async ({ page, projectConfig }) => {
-    // This test is skipped as recovery behavior depends on specific app implementation
-    // The app may or may not have automatic retry/recovery functionality
+  test('recovers gracefully when connection restored', async ({ page, projectConfig }) => {
+    // First, simulate a network failure for the decks endpoint
+    await page.route('**/v1/decks**', route => route.abort('failed'));
 
-    const decksPage = new DecksPage(page, projectConfig.baseUrl);
-    await decksPage.goto();
+    await page.goto(`${projectConfig.baseUrl}/decks`);
 
-    // Go offline
-    await page.route('**/api/**', route => route.abort('failed'));
+    // Verify error state is shown
+    const errorText = page.getByText(/failed to load/i);
+    await expect(errorText.first()).toBeVisible({ timeout: 10000 });
 
-    // Try an action
-    await decksPage.createDeckButton.click();
+    // Restore connection by removing the route intercept
+    await page.unroute('**/v1/decks**');
 
-    // Restore connection
-    await page.unroute('**/api/**');
-
-    // App should recover (specific behavior depends on implementation)
+    // Reload the page to trigger a fresh data fetch
+    await page.reload();
     await page.waitForLoadState('networkidle');
+
+    // Error should be gone — page should show decks or empty state
+    await expect(errorText).not.toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -251,23 +237,10 @@ test.describe('API Error Handling @studytab @error-handling', () => {
   test.describe('500 Server Error', () => {
     test.use({ storageState: '.auth/user.json' });
 
-    // Note: This test is skipped because the app uses server-side rendering,
-    // so route interception happens after the initial page load.
-    // The app gracefully degrades to showing empty state.
-    test.skip('handles 500 server error with user-friendly message', async ({ page, projectConfig }) => {
-      // Mock all API calls to return 500
-      await page.route('**/api/**', route => {
-        route.fulfill({
-          status: 500,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            success: false,
-            error: { code: 'INTERNAL_ERROR', message: 'Internal server error' }
-          })
-        });
-      });
-      await page.route('**/v1/**', route => {
-        route.fulfill({
+    test('handles 500 server error with user-friendly message', async ({ page, projectConfig }) => {
+      // Mock decks endpoint to return 500 (allow auth endpoints through)
+      await page.route('**/v1/decks**', route => {
+        return route.fulfill({
           status: 500,
           contentType: 'application/json',
           body: JSON.stringify({
@@ -277,21 +250,12 @@ test.describe('API Error Handling @studytab @error-handling', () => {
         });
       });
 
-      // Try to load decks page
+      // Navigate to decks page
       await page.goto(`${projectConfig.baseUrl}/decks`);
-      await page.waitForTimeout(2000);
 
-      // Should show error or empty state (graceful degradation)
-      const errorIndicators = page.locator('[role="alert"], .error');
-      const errorText = page.getByText(/error|something went wrong|try again/i);
-      const emptyState = page.getByText(/no decks/i);
-
-      const hasError = await errorIndicators.count() > 0;
-      const hasErrorText = await errorText.count() > 0;
-      const hasEmptyState = await emptyState.count() > 0;
-
-      // App should handle 500 error somehow
-      expect(hasError || hasErrorText || hasEmptyState).toBeTruthy();
+      // The decks page renders "Failed to load decks" when useDecks() errors
+      const errorText = page.getByText(/failed to load|error|something went wrong/i);
+      await expect(errorText.first()).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -635,23 +599,10 @@ test.describe('Error Recovery @studytab @error-handling', () => {
 test.describe('Concurrent Request Errors @studytab @error-handling', () => {
   test.use({ storageState: '.auth/user.json' });
 
-  // Note: This test is skipped because the app uses server-side rendering,
-  // so route interception happens after the initial page load.
-  // The app gracefully degrades to showing empty state.
-  test.skip('handles rate limiting gracefully', async ({ page, projectConfig }) => {
-    // Mock rate limit response
-    await page.route('**/v1/**', route => {
-      route.fulfill({
-        status: 429,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: false,
-          error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' }
-        })
-      });
-    });
-    await page.route('**/api/**', route => {
-      route.fulfill({
+  test('handles rate limiting gracefully', async ({ page, projectConfig }) => {
+    // Mock decks endpoint to return 429 (allow auth endpoints through)
+    await page.route('**/v1/decks**', route => {
+      return route.fulfill({
         status: 429,
         contentType: 'application/json',
         body: JSON.stringify({
@@ -662,18 +613,10 @@ test.describe('Concurrent Request Errors @studytab @error-handling', () => {
     });
 
     await page.goto(`${projectConfig.baseUrl}/decks`);
-    await page.waitForTimeout(2000);
 
-    // Should show rate limit message, error, or empty state (graceful degradation)
-    const rateLimitIndicator = page.getByText(/too many requests|rate limit|try again later|slow down/i);
-    const errorIndicator = page.locator('[role="alert"], .error');
-    const emptyState = page.getByText(/no decks/i);
-
-    const hasRateLimitMsg = await rateLimitIndicator.count() > 0;
-    const hasError = await errorIndicator.count() > 0;
-    const hasEmptyState = await emptyState.count() > 0;
-
-    // App should handle rate limiting somehow
-    expect(hasRateLimitMsg || hasError || hasEmptyState).toBeTruthy();
+    // The decks page shows "Failed to load decks" for any API error including 429.
+    // The error message from the API may also appear.
+    const errorText = page.getByText(/failed to load|too many requests|error/i);
+    await expect(errorText.first()).toBeVisible({ timeout: 10000 });
   });
 });

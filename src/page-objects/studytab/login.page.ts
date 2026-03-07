@@ -19,7 +19,7 @@ export class LoginPage extends BasePage {
     this.emailInput = page.locator('[data-testid="email-input"], input[name="email"], input[type="email"]').first();
     this.passwordInput = page.locator('[data-testid="password-input"], input[name="password"], input[type="password"]').first();
     this.submitButton = page.locator('[data-testid="login-button"], button[type="submit"]').first();
-    this.errorMessage = page.locator('[data-testid="login-error"], [role="alert"], .error-message').first();
+    this.errorMessage = page.locator('[data-testid="login-error"], [role="alert"], .error-message, .text-destructive').first();
     this.forgotPasswordLink = page.getByRole('link', { name: /forgot.*password/i });
     this.registerLink = page.locator('a:has-text("Sign up"), a:has-text("Register"), a:has-text("Create account")').first();
     this.googleLoginButton = page.locator('[data-testid="google-login"], button:has-text("Google")').first();

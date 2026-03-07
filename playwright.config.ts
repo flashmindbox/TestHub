@@ -67,6 +67,10 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: process.env.COAPP_API_URL || 'http://localhost:4001',
+        // Bypass rate limiting for tests
+        extraHTTPHeaders: {
+          'x-test-bypass': process.env.COAPP_TEST_BYPASS_KEY || '',
+        },
       },
     },
 
@@ -77,6 +81,10 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: process.env.COAPP_WEB_URL || 'http://localhost:4000',
+        // Bypass rate limiting for tests
+        extraHTTPHeaders: {
+          'x-test-bypass': process.env.COAPP_TEST_BYPASS_KEY || '',
+        },
       },
     },
 

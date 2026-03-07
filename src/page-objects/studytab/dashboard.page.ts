@@ -15,13 +15,13 @@ export class DashboardPage extends BasePage {
   constructor(page: Page, baseUrl: string) {
     super(page, baseUrl);
     this.navigation = new NavigationComponent(page);
-    this.welcomeHeading = page.getByRole('heading', { name: /welcome back/i });
-    this.statsSection = page.locator('main').getByText(/Due Today|Streak|Total Cards|Total Decks/);
+    this.welcomeHeading = page.getByRole('heading', { name: /good (morning|afternoon|evening)/i });
+    this.statsSection = page.locator('main').getByText(/Streak|New|Done|Focus/);
     this.recentDecks = page.locator('[data-testid="recent-decks"], .recent-decks, .deck-list');
     this.studyButton = page.locator('button:has-text("Start Study Session"), a:has-text("Start Study Session"), button:has-text("Study"), a:has-text("Study")').first();
     this.createDeckButton = page.locator('button:has-text("Create New Deck"), a:has-text("Create New Deck"), button:has-text("Create"), button:has-text("New Deck")').first();
-    this.streakCounter = page.getByText(/\d+\s*days?\s*Streak/i).or(page.getByText(/Streak/i));
-    this.dueCardsCount = page.getByText(/\d+\s*Due Today/i).or(page.getByText(/Due Today/i));
+    this.streakCounter = page.getByText(/\d+\s*days?\s*Streak/i).or(page.getByText('Streak', { exact: true }));
+    this.dueCardsCount = page.getByText(/\d+\s*cards?\s*due/i);
   }
 
   async goto() {
@@ -60,7 +60,7 @@ export class DashboardPage extends BasePage {
 
   async expectLoaded() {
     await expect(this.welcomeHeading).toBeVisible();
-    // Verify stats loaded by checking for common stat text
-    await expect(this.page.getByText('Due Today')).toBeVisible();
+    // Verify stats loaded by checking for stat pill
+    await expect(this.page.getByText('Streak')).toBeVisible();
   }
 }

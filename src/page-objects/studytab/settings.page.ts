@@ -30,7 +30,7 @@ export class SettingsPage extends BasePage {
   constructor(page: Page, baseUrl: string) {
     super(page, baseUrl);
     this.heading = page.getByRole('heading', { name: 'Settings', level: 1 });
-    this.preferencesHeading = page.getByRole('heading', { name: 'Preferences', level: 1 });
+    this.preferencesHeading = page.getByRole('heading', { name: 'Settings', level: 1 });
 
     // Study Preferences
     this.studyPreferencesHeading = page.getByRole('heading', { name: 'Study Preferences' });

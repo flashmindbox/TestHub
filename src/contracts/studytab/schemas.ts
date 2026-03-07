@@ -241,7 +241,7 @@ export const UpdateCardInputSchema = z.object({
 /**
  * Study answer rating (for spaced repetition)
  */
-export const StudyRatingSchema = z.enum(['again', 'hard', 'good', 'easy']);
+export const StudyRatingSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 
 /**
  * Study session statistics schema
@@ -266,25 +266,30 @@ export const StudySessionSchema = z.object({
 /**
  * Card due for study schema
  */
-export const StudyCardSchema = CardSchema.extend({
-  /** Whether card is new (never reviewed) */
-  isNew: z.boolean().optional(),
-  /** Whether card is due for review */
-  isDue: z.boolean().optional(),
-});
+export const StudyCardSchema = z.object({
+  id: IdSchema,
+  deckId: IdSchema,
+  front: z.string(),
+  back: z.string(),
+  type: z.string().nullable().optional(),
+  deck: z.object({
+    name: z.string(),
+    color: z.string().nullable(),
+  }).optional(),
+}).passthrough();
 
 /**
  * Study session response (cards to study)
  */
 export const StudyCardsResponseSchema = z.object({
-  /** Cards due for study */
-  cards: z.array(StudyCardSchema),
-  /** Total due count */
-  totalDue: z.number().int().nonnegative().optional(),
-  /** New cards count */
-  newCount: z.number().int().nonnegative().optional(),
-  /** Review cards count */
-  reviewCount: z.number().int().nonnegative().optional(),
+  newCards: z.array(StudyCardSchema),
+  learningCards: z.array(StudyCardSchema),
+  reviewCards: z.array(StudyCardSchema),
+  counts: z.object({
+    new: z.number().int().nonnegative(),
+    learning: z.number().int().nonnegative(),
+    review: z.number().int().nonnegative(),
+  }),
 });
 
 /**
@@ -293,8 +298,57 @@ export const StudyCardsResponseSchema = z.object({
 export const SubmitStudyAnswerSchema = z.object({
   cardId: IdSchema,
   rating: StudyRatingSchema,
-  responseTime: z.number().int().nonnegative().optional(),
+  responseTimeMs: z.number().int().nonnegative().optional(),
 });
+
+/**
+ * Study review response data (returned by POST /study/review)
+ */
+export const StudyReviewResponseSchema = z.object({
+  cardId: IdSchema,
+  rating: z.number(),
+  nextReview: DateTimeSchema,
+  interval: z.number(),
+  easeFactor: z.number(),
+  state: z.string(),
+  algorithm: z.string(),
+  stability: z.number().nullable().optional(),
+  difficulty: z.number().nullable().optional(),
+});
+
+/**
+ * Study stats response data (returned by GET /study/stats)
+ */
+export const StudyStatsDataSchema = z.object({
+  today: z.object({
+    reviewed: z.number().int().nonnegative(),
+    correct: z.number().int().nonnegative(),
+    incorrect: z.number().int().nonnegative(),
+    timeSpentMs: z.number().nonnegative(),
+  }),
+  streak: z.object({
+    current: z.number().int().nonnegative(),
+    longest: z.number().int().nonnegative(),
+  }),
+  total: z.object({
+    cards: z.number().int().nonnegative(),
+    reviews: z.number().int().nonnegative(),
+    studyTimeMs: z.number().nonnegative(),
+  }),
+  dailyActivity: z.array(z.object({
+    date: z.string(),
+    count: z.number().int().nonnegative(),
+    minutes: z.number().nonnegative(),
+  })),
+});
+
+/**
+ * Study forecast response data (returned by GET /study/forecast)
+ */
+export const StudyForecastDataSchema = z.array(z.object({
+  date: z.string(),
+  count: z.number().int().nonnegative(),
+}));
 
 // =============================================================================
 // POMODORO SCHEMAS
@@ -515,3 +569,12 @@ export type GenerateCardsInput = z.infer<typeof GenerateCardsInputSchema>;
 
 /** Inferred GeneratedCard type */
 export type GeneratedCard = z.infer<typeof GeneratedCardSchema>;
+
+/** Inferred StudyReviewResponse type */
+export type StudyReviewResponse = z.infer<typeof StudyReviewResponseSchema>;
+
+/** Inferred StudyStatsData type */
+export type StudyStatsData = z.infer<typeof StudyStatsDataSchema>;
+
+/** Inferred StudyForecastData type */
+export type StudyForecastData = z.infer<typeof StudyForecastDataSchema>;

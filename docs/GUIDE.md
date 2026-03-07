@@ -931,7 +931,7 @@ Don't worry if unsure—tests will tell you if something's wrong!
 ### Step 2: Navigate to TestHub
 
 ```
-cd C:\MyProjects\TestHub
+cd C:\MyProjects\studytab-ecosystem\TestHub
 ```
 
 ### Step 3: Run Smoke Tests

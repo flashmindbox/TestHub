@@ -52,14 +52,14 @@ Check the error message below ↓
 | Cause | Solution |
 |-------|----------|
 | Dependencies not installed | Run `npm install` in TestHub folder |
-| Wrong directory | Make sure you're in `C:\MyProjects\TestHub` |
+| Wrong directory | Make sure you're in `C:\MyProjects\studytab-ecosystem\TestHub` |
 | Node.js not installed | Install Node.js from nodejs.org |
 | Corrupted node_modules | Delete `node_modules` folder and run `npm install` again |
 
 **Steps to try:**
 ```bash
 # 1. Make sure you're in the right folder
-cd C:\MyProjects\TestHub
+cd C:\MyProjects\studytab-ecosystem\TestHub
 
 # 2. Install dependencies
 npm install

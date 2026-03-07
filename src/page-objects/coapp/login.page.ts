@@ -10,9 +10,9 @@ export class LoginPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.emailInput = page.getByRole('textbox', { name: 'Email' });
-    this.passwordInput = page.getByRole('textbox', { name: 'Password', exact: true });
-    this.tenantInput = page.getByRole('textbox', { name: 'Institute ID' });
+    this.emailInput = page.getByLabel('Email');
+    this.passwordInput = page.getByLabel('Password');
+    this.tenantInput = page.getByLabel(/Institute ID/);
     this.submitButton = page.getByRole('button', { name: 'Sign in' });
     this.registerLink = page.getByRole('link', { name: 'Register' });
   }
@@ -23,13 +23,36 @@ export class LoginPage {
   }
 
   async login(email: string, password: string, tenantSlug?: string) {
+    // Clear and fill email
+    await this.emailInput.clear();
     await this.emailInput.fill(email);
+
+    // Clear and fill password
+    await this.passwordInput.clear();
     await this.passwordInput.fill(password);
+
+    // Fill tenant slug if provided (optional field)
     if (tenantSlug) {
+      await this.tenantInput.clear();
       await this.tenantInput.fill(tenantSlug);
     }
+
+    // Wait for button to be enabled and click
+    await expect(this.submitButton).toBeEnabled();
     await this.submitButton.click();
-    await this.page.waitForURL('**/dashboard', { timeout: 15000 });
+
+    // Wait for either dashboard redirect or error toast
+    await Promise.race([
+      this.page.waitForURL('**/dashboard', { timeout: 20000 }),
+      this.page.locator('[data-sonner-toast][data-type="error"]').waitFor({ state: 'visible', timeout: 20000 }),
+    ]);
+
+    // If we got an error toast, throw
+    const errorToast = this.page.locator('[data-sonner-toast][data-type="error"]');
+    if (await errorToast.isVisible().catch(() => false)) {
+      const message = await errorToast.textContent();
+      throw new Error(`Login failed: ${message}`);
+    }
   }
 
   async loginExpectError(email: string, password: string) {
