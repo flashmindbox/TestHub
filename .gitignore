@@ -34,3 +34,13 @@ coverage/
 # Temp files
 *.tmp
 *.temp
+
+# Playwright cache
+playwright/.cache/
+
+# Screenshots (test artifacts)
+screenshots/
+
+# Debug scripts
+debug-*.js
+open-browser.js

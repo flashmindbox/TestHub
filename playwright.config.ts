@@ -88,6 +88,15 @@ export default defineConfig({
       },
     },
 
+    // Marketplace API tests
+    {
+      name: 'marketplace-api',
+      testDir: './tests/api/marketplace',
+      use: {
+        baseURL: process.env.MARKETPLACE_API_URL || 'http://localhost:3002',
+      },
+    },
+
     // Unit tests (no browser needed)
     {
       name: 'unit',
