@@ -3,8 +3,6 @@ import { test, expect } from '@playwright/test';
 const API = process.env.MARKETPLACE_API_URL || 'http://localhost:3002';
 const api = (path: string) => `${API}/api/v1${path}`;
 const authApi = (path: string) => `${API}/v1/auth${path}`;
-const STUDYTAB_API = process.env.STUDYTAB_API_URL || 'http://localhost:3001';
-
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 // Shared state
@@ -148,26 +146,19 @@ test.describe.serial('Student Marketplace Flow @marketplace @api @student', () =
       }
     }
 
-    // --- Try to set up student auth ---
-    // Student auth requires OAuth exchange with StudyTab
-    // Try: hit StudyTab to create a test auth code
+    // --- Set up student via internal test endpoint ---
     try {
-      const codeRes = await request.post(`${STUDYTAB_API}/api/v1/internal/create-test-auth-code`, {
+      const res = await request.post(api('/internal/create-test-student'), {
         headers: { 'X-Internal-Secret': process.env.MARKETPLACE_SECRET || 'test-secret' },
         data: { email: 'test-student@studytab.test' },
       });
-      if (codeRes.ok()) {
-        const { code } = await codeRes.json();
-        const exchangeRes = await request.post(api('/student-auth/exchange'), {
-          data: { code, state: 'test' },
-        });
-        if (exchangeRes.ok()) {
-          studentCookie = extractCookies(exchangeRes);
-          studentAvailable = true;
-        }
+      if (res.ok()) {
+        const { token } = await res.json();
+        studentCookie = `marketplace_student_session=${token}`;
+        studentAvailable = true;
       }
     } catch {
-      // StudyTab not running — student auth tests will be skipped
+      // Marketplace API not running — student auth tests will be skipped
     }
   });
 
